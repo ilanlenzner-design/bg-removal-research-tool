@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: bg-compare-pro
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: REPLICATE_API_KEY
+        sync: false
