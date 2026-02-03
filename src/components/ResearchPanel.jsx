@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TEST_CATEGORIES } from '../services/testDatabase';
 
-export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring, isSaved, replicateApiKey }) {
+export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring, isSaved, replicateApiKey, onAutoScore }) {
     const [category, setCategory] = useState('');
     const [testName, setTestName] = useState('');
     const [notes, setNotes] = useState('');
@@ -11,6 +11,14 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
     const hasResults = Object.keys(results).some(id => results[id]?.output);
     const hasScores = Object.keys(scores).length > 0;
     const showUnsavedWarning = !isSaved && hasResults;
+
+    // Auto-populate analysis from auto-run
+    React.useEffect(() => {
+        if (window.__imageAnalysis && !imageAnalysis) {
+            setImageAnalysis(window.__imageAnalysis);
+            delete window.__imageAnalysis;
+        }
+    }, [hasResults]);
 
     const analyzeImage = async () => {
         if (!replicateApiKey) {
@@ -154,7 +162,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                             />
                         )}
                         <p className="analysis-hint">
-                            AI analyzes subject, style, challenges - helps build recommendation engine later
+                            Analysis and scoring happen automatically after comparison completes. You can re-run analysis here if needed.
                         </p>
                     </div>
                 )}

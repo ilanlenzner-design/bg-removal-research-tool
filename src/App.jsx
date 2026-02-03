@@ -125,6 +125,83 @@ function App() {
         await Promise.all(promises);
         setIsProcessing(false);
         setIsSaved(false); // Mark as unsaved since we have new results
+
+        // Auto-run analysis and scoring after results complete
+        // Use setTimeout to ensure state has updated
+        setTimeout(() => {
+            setResults(currentResults => {
+                autoAnalyzeAndScore(currentResults);
+                return currentResults;
+            });
+        }, 1500);
+    };
+
+    const autoAnalyzeAndScore = async (completedResults) => {
+        try {
+            // Step 1: Analyze the original image
+            const analysisResponse = await fetch('/api/analyze-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageUrl,
+                    replicateApiKey: apiKey
+                })
+            });
+
+            if (analysisResponse.ok) {
+                const data = await analysisResponse.json();
+                // Store analysis in a ref or state that ResearchPanel can access
+                window.__imageAnalysis = data.analysis;
+            }
+
+            // Step 2: Score each result
+            const scoringPromises = MODELS.map(async (model) => {
+                const result = completedResults[model.id];
+                if (!result?.output) return null;
+
+                const resultUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+
+                try {
+                    const scoreResponse = await fetch('/api/score-result', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            resultUrl,
+                            modelName: model.name,
+                            replicateApiKey: apiKey
+                        })
+                    });
+
+                    if (scoreResponse.ok) {
+                        const data = await scoreResponse.json();
+                        return { modelId: model.id, scores: data.scores };
+                    }
+                } catch (err) {
+                    console.error(`Failed to score ${model.name}:`, err);
+                }
+                return null;
+            });
+
+            const scoringResults = await Promise.all(scoringPromises);
+
+            // Populate scores
+            const newScores = {};
+            scoringResults.forEach(result => {
+                if (result) {
+                    newScores[result.modelId] = {
+                        ...result.scores,
+                        overall: calculateOverall(result.scores)
+                    };
+                }
+            });
+
+            if (Object.keys(newScores).length > 0) {
+                setScores(newScores);
+                setShowScoring(true);
+            }
+        } catch (error) {
+            console.error('Auto-analysis failed:', error);
+        }
     };
 
     const downloadImage = async (url, name) => {
@@ -243,6 +320,19 @@ function App() {
         const values = metrics.map(m => score[m] || 0).filter(v => v > 0);
         if (values.length === 0) return 0;
         return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+    };
+
+    const handleAutoScore = (aiScores) => {
+        // Merge AI scores with existing scores and calculate overalls
+        const updatedScores = {};
+        Object.entries(aiScores).forEach(([modelId, score]) => {
+            updatedScores[modelId] = {
+                ...score,
+                overall: calculateOverall(score)
+            };
+        });
+        setScores(prev => ({ ...prev, ...updatedScores }));
+        setShowScoring(true); // Auto-show scoring panel
     };
 
     return (
@@ -427,6 +517,7 @@ function App() {
                         onToggleScoring={() => setShowScoring(!showScoring)}
                         isSaved={isSaved}
                         replicateApiKey={apiKey}
+                        onAutoScore={handleAutoScore}
                     />
                 )}
             </main>

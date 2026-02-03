@@ -100,6 +100,92 @@ Keep under 150 words, be concise and specific.`;
     }
 });
 
+// Score individual result endpoint
+app.post('/api/score-result', async (req, res) => {
+    try {
+        const { resultUrl, modelName, replicateApiKey } = req.body;
+        const apiKey = replicateApiKey || process.env.REPLICATE_API_KEY;
+
+        if (!apiKey) {
+            return res.status(400).json({
+                error: 'Replicate API key not provided'
+            });
+        }
+
+        const prompt = `Evaluate this background removal result. Rate the quality on these metrics (1-10 scale):
+
+**Edge Accuracy**: How clean are the edges? Any artifacts, halos, or rough borders?
+**Detail Preservation**: Are fine details like hair, fur, or small elements preserved well?
+**Transparency Quality**: How smooth is the alpha channel? Any semi-transparent artifacts?
+
+Respond with ONLY three numbers, one per line:
+Edge: [number 1-10]
+Detail: [number 1-10]
+Transparency: [number 1-10]`;
+
+        const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Token ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                version: '2facb4a474a0462c15041b78b1ad70952ea46b5ec6ad29583c0b29dbd4249591',
+                input: {
+                    image: resultUrl,
+                    prompt: prompt,
+                    max_tokens: 100
+                }
+            })
+        });
+
+        if (!createResponse.ok) {
+            throw new Error('Failed to create scoring prediction');
+        }
+
+        let prediction = await createResponse.json();
+
+        // Poll for result
+        while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+                headers: { 'Authorization': `Token ${apiKey}` }
+            });
+
+            if (!statusResponse.ok) {
+                throw new Error('Failed to check prediction status');
+            }
+
+            prediction = await statusResponse.json();
+        }
+
+        if (prediction.status === 'failed') {
+            throw new Error('Scoring failed');
+        }
+
+        const responseText = Array.isArray(prediction.output)
+            ? prediction.output.join('')
+            : prediction.output;
+
+        // Parse scores from response
+        const edgeMatch = responseText.match(/Edge[:\s]+(\d+)/i);
+        const detailMatch = responseText.match(/Detail[:\s]+(\d+)/i);
+        const transparencyMatch = responseText.match(/Transparency[:\s]+(\d+)/i);
+
+        const scores = {
+            edgeAccuracy: edgeMatch ? parseInt(edgeMatch[1]) : 7,
+            detailPreservation: detailMatch ? parseInt(detailMatch[1]) : 7,
+            transparency: transparencyMatch ? parseInt(transparencyMatch[1]) : 7
+        };
+
+        res.json({ scores });
+    } catch (error) {
+        console.error('Scoring error:', error);
+        res.status(500).json({ error: 'Scoring failed' });
+    }
+});
+
 // Proxy for Replicate API
 app.all('/replicate/*', async (req, res) => {
     const replicatePath = req.path.replace('/replicate', '');
