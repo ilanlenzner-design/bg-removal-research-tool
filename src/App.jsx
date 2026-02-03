@@ -338,7 +338,9 @@ function App() {
     return (
         <div className="app-container">
             <header>
-                <div className="logo">BG Compare Pro</div>
+                <div className="logo">
+                    BG Compare Pro <span style={{ fontSize: '0.6em', opacity: 0.6, fontWeight: 'normal' }}>v2.0-auto</span>
+                </div>
                 <div className="header-buttons">
                     <button className="settings-btn" onClick={() => setShowHistory(true)}>
                         📚 Test Database
