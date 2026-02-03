@@ -5,10 +5,44 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
     const [category, setCategory] = useState('');
     const [testName, setTestName] = useState('');
     const [notes, setNotes] = useState('');
+    const [imageAnalysis, setImageAnalysis] = useState('');
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [hasClaudeKey, setHasClaudeKey] = useState(false);
 
     const hasResults = Object.keys(results).some(id => results[id]?.output);
     const hasScores = Object.keys(scores).length > 0;
     const showUnsavedWarning = !isSaved && hasResults;
+
+    // Check if Claude API key is configured
+    React.useEffect(() => {
+        fetch('/api/config')
+            .then(res => res.json())
+            .then(config => setHasClaudeKey(config.hasClaudeKey))
+            .catch(() => setHasClaudeKey(false));
+    }, []);
+
+    const analyzeImage = async () => {
+        setIsAnalyzing(true);
+        try {
+            const response = await fetch('/api/analyze-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageUrl })
+            });
+
+            if (!response.ok) {
+                throw new Error('Analysis failed');
+            }
+
+            const data = await response.json();
+            setImageAnalysis(data.analysis);
+        } catch (error) {
+            console.error('Image analysis error:', error);
+            alert('Failed to analyze image. Make sure ANTHROPIC_API_KEY is set in Railway.');
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const handleSave = () => {
         if (!category || !testName) {
@@ -20,6 +54,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
             category,
             name: testName,
             notes,
+            imageAnalysis,
             scores,
             results,
             imageUrl
@@ -31,6 +66,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
         setCategory('');
         setTestName('');
         setNotes('');
+        setImageAnalysis('');
 
         alert('Test saved successfully!');
     };
@@ -95,6 +131,34 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                         />
                     </div>
                 </div>
+
+                {/* AI Image Analysis */}
+                {hasClaudeKey && imageUrl && (
+                    <div className="analysis-section">
+                        <div className="analysis-header">
+                            <label>🤖 AI Image Analysis</label>
+                            <button
+                                className="btn-analyze"
+                                onClick={analyzeImage}
+                                disabled={isAnalyzing}
+                            >
+                                {isAnalyzing ? 'Analyzing...' : 'Analyze Image'}
+                            </button>
+                        </div>
+                        {imageAnalysis && (
+                            <textarea
+                                value={imageAnalysis}
+                                onChange={(e) => setImageAnalysis(e.target.value)}
+                                className="analysis-text"
+                                rows="6"
+                                placeholder="AI analysis will appear here..."
+                            />
+                        )}
+                        <p className="analysis-hint">
+                            AI analyzes subject, style, challenges - helps build recommendation engine later
+                        </p>
+                    </div>
+                )}
 
                 {/* Scoring Instructions */}
                 {showScoring && hasResults && (
@@ -187,6 +251,67 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                     flex-direction: column;
                     gap: 1rem;
                     margin-bottom: 1.5rem;
+                }
+
+                .analysis-section {
+                    background: rgba(56, 189, 248, 0.05);
+                    border: 1px solid rgba(56, 189, 248, 0.2);
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin-bottom: 1.5rem;
+                }
+
+                .analysis-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 0.75rem;
+                }
+
+                .analysis-header label {
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: var(--accent);
+                }
+
+                .btn-analyze {
+                    padding: 0.5rem 1rem;
+                    background: var(--accent);
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 0.85rem;
+                    cursor: pointer;
+                    transition: opacity 0.2s;
+                }
+
+                .btn-analyze:hover:not(:disabled) {
+                    opacity: 0.9;
+                }
+
+                .btn-analyze:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+
+                .analysis-text {
+                    width: 100%;
+                    padding: 0.75rem;
+                    border-radius: 6px;
+                    border: 1px solid var(--border);
+                    background: var(--bg);
+                    color: var(--text);
+                    font-size: 0.85rem;
+                    font-family: inherit;
+                    resize: vertical;
+                    line-height: 1.5;
+                }
+
+                .analysis-hint {
+                    margin: 0.5rem 0 0 0;
+                    font-size: 0.75rem;
+                    color: var(--text-dim);
+                    font-style: italic;
                 }
 
                 .input-group {
