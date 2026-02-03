@@ -339,7 +339,7 @@ function App() {
         <div className="app-container">
             <header>
                 <div className="logo">
-                    BG Compare Pro <span style={{ fontSize: '0.6em', opacity: 0.6, fontWeight: 'normal' }}>v2.0-auto</span>
+                    BG Compare Pro <span style={{ fontSize: '0.6em', opacity: 0.6, fontWeight: 'normal' }}>v2.1-live</span>
                 </div>
                 <div className="header-buttons">
                     <button className="settings-btn" onClick={() => setShowHistory(true)}>
