@@ -1,9 +1,39 @@
 export const MODELS = [
-    { id: '851-labs/background-remover', name: '851 Labs' },
-    { id: 'lucataco/remove-bg', name: 'Lucataco Tracer' },
-    { id: 'bria/remove-background', name: 'BRIA AI (Official)' },
-    { id: 'men1scus/birefnet', name: 'BiRefNet (High-Res)' },
-    { id: 'cjwbw/rembg', name: 'CJWBW RemBG' }
+    {
+        id: '851-labs/background-remover',
+        name: '851 Labs',
+        description: 'Community model for general use',
+        bestFor: 'General purpose',
+        color: '#3b82f6'
+    },
+    {
+        id: 'lucataco/remove-bg',
+        name: 'Lucataco Tracer',
+        description: 'Fast processing model',
+        bestFor: 'Quick results',
+        color: '#8b5cf6'
+    },
+    {
+        id: 'bria/remove-background',
+        name: 'BRIA AI (Official)',
+        description: 'State-of-the-art commercial model with 256 transparency levels',
+        bestFor: 'E-commerce, products, advertising, multi-object scenes',
+        color: '#10b981'
+    },
+    {
+        id: 'men1scus/birefnet',
+        name: 'BiRefNet (High-Res)',
+        description: 'High-resolution specialist with bilateral processing',
+        bestFor: 'Fine details, portraits, hair/fur, complex scenes',
+        color: '#f59e0b'
+    },
+    {
+        id: 'cjwbw/rembg',
+        name: 'CJWBW RemBG',
+        description: 'Reliable u2net-based model',
+        bestFor: 'Product shots, clear subjects, high-contrast images',
+        color: '#ef4444'
+    }
 ];
 
 export class ReplicateService {

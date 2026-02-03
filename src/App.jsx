@@ -272,8 +272,14 @@ function App() {
 
                 <div className="model-grid">
                     {MODELS.map(model => (
-                        <div key={model.id} className="model-card">
+                        <div key={model.id} className="model-card" style={{ borderTop: `3px solid ${model.color}` }}>
                             <div className="model-name">{model.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>
+                                {model.description}
+                            </div>
+                            <div style={{ fontSize: '0.65rem', color: model.color, marginBottom: '0.5rem', fontWeight: '500' }}>
+                                Best for: {model.bestFor}
+                            </div>
                             {results[model.id] && (
                                 <div className={`status-badge status-${results[model.id].status}`}>
                                     {results[model.id].status}
