@@ -16,6 +16,7 @@ function App() {
     const [scores, setScores] = useState({});
     const [showScoring, setShowScoring] = useState(false);
     const [hasServerKey, setHasServerKey] = useState(false);
+    const [isSaved, setIsSaved] = useState(true);
 
     // Fetch server API key on mount
     React.useEffect(() => {
@@ -43,12 +44,35 @@ function App() {
     const [manualResult, setManualResult] = useState(null);
     const canvasRef = React.useRef(null);
 
+    const hasUnsavedResults = () => {
+        return !isSaved && Object.keys(results).some(id => results[id]?.output);
+    };
+
     const handleUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
+            // Check for unsaved data
+            if (hasUnsavedResults()) {
+                const confirmed = window.confirm(
+                    '⚠️ You have unsaved test results!\n\n' +
+                    'Uploading a new image will clear your current results. ' +
+                    'Make sure to save your test to the database first.\n\n' +
+                    'Continue anyway?'
+                );
+                if (!confirmed) {
+                    e.target.value = ''; // Reset file input
+                    return;
+                }
+            }
+
             const reader = new FileReader();
             reader.onloadend = () => {
                 setImageUrl(reader.result);
+                setResults({});
+                setScores({});
+                setManualResult(null);
+                setManualColor(null);
+                setIsSaved(true);
             };
             reader.readAsDataURL(file);
         }
@@ -100,6 +124,7 @@ function App() {
 
         await Promise.all(promises);
         setIsProcessing(false);
+        setIsSaved(false); // Mark as unsaved since we have new results
     };
 
     const downloadImage = async (url, name) => {
@@ -203,6 +228,7 @@ function App() {
         // Clear scores after saving
         setScores({});
         setShowScoring(false);
+        setIsSaved(true); // Mark as saved
     };
 
     const handleScoreChange = (modelId, newScore) => {
@@ -307,9 +333,21 @@ function App() {
 
                             <div className="controls" style={{ marginTop: '2rem' }}>
                                 <button className="settings-btn" onClick={() => {
+                                    if (hasUnsavedResults()) {
+                                        const confirmed = window.confirm(
+                                            '⚠️ You have unsaved test results!\n\n' +
+                                            'Changing the image will clear your current results. ' +
+                                            'Make sure to save your test to the database first.\n\n' +
+                                            'Continue anyway?'
+                                        );
+                                        if (!confirmed) return;
+                                    }
                                     setImageUrl('');
                                     setManualResult(null);
                                     setManualColor(null);
+                                    setResults({});
+                                    setScores({});
+                                    setIsSaved(true);
                                 }}>Change Image</button>
                                 <button className="btn-primary" onClick={startComparison} disabled={isProcessing}>
                                     {isProcessing ? 'Processing AI Comparison...' : 'Run AI Comparison'}
@@ -387,6 +425,7 @@ function App() {
                         imageUrl={imageUrl}
                         showScoring={showScoring}
                         onToggleScoring={() => setShowScoring(!showScoring)}
+                        isSaved={isSaved}
                     />
                 )}
             </main>

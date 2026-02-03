@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { TEST_CATEGORIES } from '../services/testDatabase';
 
-export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring }) {
+export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring, isSaved }) {
     const [category, setCategory] = useState('');
     const [testName, setTestName] = useState('');
     const [notes, setNotes] = useState('');
 
     const hasResults = Object.keys(results).some(id => results[id]?.output);
     const hasScores = Object.keys(scores).length > 0;
+    const showUnsavedWarning = !isSaved && hasResults;
 
     const handleSave = () => {
         if (!category || !testName) {
@@ -46,6 +47,12 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                     {showScoring ? 'Hide Scoring' : 'Show Scoring'}
                 </button>
             </div>
+
+            {showUnsavedWarning && (
+                <div className="unsaved-warning">
+                    ⚠️ <strong>Unsaved Results!</strong> Make sure to save this test to the database before uploading a new image or closing the page.
+                </div>
+            )}
 
             <div className="research-content">
                 {/* Test Metadata */}
@@ -146,6 +153,33 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                 .btn-toggle:disabled {
                     opacity: 0.5;
                     cursor: not-allowed;
+                }
+
+                .unsaved-warning {
+                    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(245, 158, 11, 0.1));
+                    border: 2px solid #f59e0b;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin: 1rem 0;
+                    color: #fbbf24;
+                    font-size: 0.9rem;
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    animation: pulse 2s ease-in-out infinite;
+                }
+
+                .unsaved-warning strong {
+                    color: #fbbf24;
+                }
+
+                @keyframes pulse {
+                    0%, 100% {
+                        opacity: 1;
+                    }
+                    50% {
+                        opacity: 0.8;
+                    }
                 }
 
                 .metadata-section {
