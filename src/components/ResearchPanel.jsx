@@ -1,39 +1,13 @@
 import React, { useState } from 'react';
 import { TEST_CATEGORIES } from '../services/testDatabase';
 
-export function ResearchPanel({ onSaveTest, results, imageUrl }) {
+export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring }) {
     const [category, setCategory] = useState('');
     const [testName, setTestName] = useState('');
     const [notes, setNotes] = useState('');
-    const [scores, setScores] = useState({});
-    const [showScoring, setShowScoring] = useState(false);
 
     const hasResults = Object.keys(results).some(id => results[id]?.output);
-
-    const updateScore = (modelId, metric, value) => {
-        setScores(prev => ({
-            ...prev,
-            [modelId]: {
-                ...(prev[modelId] || {}),
-                [metric]: parseInt(value)
-            }
-        }));
-    };
-
-    const calculateOverall = (modelScores) => {
-        if (!modelScores) return 0;
-        const metrics = ['edgeAccuracy', 'detailPreservation', 'transparency'];
-        const values = metrics.map(m => modelScores[m] || 0).filter(v => v > 0);
-        if (values.length === 0) return 0;
-        return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-    };
-
-    // Auto-calculate overall scores
-    Object.keys(scores).forEach(modelId => {
-        if (scores[modelId] && !scores[modelId].overall) {
-            scores[modelId].overall = calculateOverall(scores[modelId]);
-        }
-    });
+    const hasScores = Object.keys(scores).length > 0;
 
     const handleSave = () => {
         if (!category || !testName) {
@@ -56,13 +30,9 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
         setCategory('');
         setTestName('');
         setNotes('');
-        setScores({});
-        setShowScoring(false);
 
         alert('Test saved successfully!');
     };
-
-    const modelIds = Object.keys(results).filter(id => results[id]?.output);
 
     return (
         <div className="research-panel">
@@ -70,9 +40,10 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                 <h3>📊 Research Panel</h3>
                 <button
                     className="btn-toggle"
-                    onClick={() => setShowScoring(!showScoring)}
+                    onClick={onToggleScoring}
+                    disabled={!hasResults}
                 >
-                    {showScoring ? 'Hide' : 'Show'} Scoring
+                    {showScoring ? 'Hide Scoring' : 'Show Scoring'}
                 </button>
             </div>
 
@@ -118,60 +89,10 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                     </div>
                 </div>
 
-                {/* Scoring Section */}
+                {/* Scoring Instructions */}
                 {showScoring && hasResults && (
-                    <div className="scoring-section">
-                        <h4>Score Each Model (1-10)</h4>
-                        {modelIds.map(modelId => {
-                            const modelName = modelId.split('/')[1] || modelId;
-                            const modelScores = scores[modelId] || {};
-
-                            return (
-                                <div key={modelId} className="model-scoring">
-                                    <div className="model-scoring-header">{modelName}</div>
-
-                                    <div className="score-row">
-                                        <label>Edge Accuracy</label>
-                                        <input
-                                            type="range"
-                                            min="1"
-                                            max="10"
-                                            value={modelScores.edgeAccuracy || 5}
-                                            onChange={(e) => updateScore(modelId, 'edgeAccuracy', e.target.value)}
-                                        />
-                                        <span className="score-value">{modelScores.edgeAccuracy || 5}</span>
-                                    </div>
-
-                                    <div className="score-row">
-                                        <label>Detail Preservation</label>
-                                        <input
-                                            type="range"
-                                            min="1"
-                                            max="10"
-                                            value={modelScores.detailPreservation || 5}
-                                            onChange={(e) => updateScore(modelId, 'detailPreservation', e.target.value)}
-                                        />
-                                        <span className="score-value">{modelScores.detailPreservation || 5}</span>
-                                    </div>
-
-                                    <div className="score-row">
-                                        <label>Transparency Quality</label>
-                                        <input
-                                            type="range"
-                                            min="1"
-                                            max="10"
-                                            value={modelScores.transparency || 5}
-                                            onChange={(e) => updateScore(modelId, 'transparency', e.target.value)}
-                                        />
-                                        <span className="score-value">{modelScores.transparency || 5}</span>
-                                    </div>
-
-                                    <div className="overall-score">
-                                        Overall: <strong>{calculateOverall(modelScores)}/10</strong>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                    <div className="scoring-info">
+                        <p>⬆️ Use the scoring controls under each result image above</p>
                     </div>
                 )}
 
@@ -182,6 +103,7 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                     disabled={!category || !testName || !hasResults}
                 >
                     💾 Save Test to Database
+                    {hasScores && <span className="score-count">({Object.keys(scores).length} models scored)</span>}
                 </button>
 
                 {!hasResults && (
@@ -218,6 +140,12 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                     border-radius: 6px;
                     cursor: pointer;
                     font-size: 0.85rem;
+                    transition: opacity 0.2s;
+                }
+
+                .btn-toggle:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
 
                 .metadata-section {
@@ -259,61 +187,19 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                     resize: vertical;
                 }
 
-                .scoring-section {
-                    background: var(--bg);
-                    padding: 1.5rem;
+                .scoring-info {
+                    background: rgba(56, 189, 248, 0.1);
+                    border: 1px solid var(--accent);
                     border-radius: 8px;
-                    margin-bottom: 1.5rem;
-                }
-
-                .scoring-section h4 {
-                    margin: 0 0 1rem 0;
-                    font-size: 1rem;
-                }
-
-                .model-scoring {
-                    background: var(--card-bg);
                     padding: 1rem;
-                    border-radius: 6px;
-                    margin-bottom: 1rem;
-                }
-
-                .model-scoring-header {
-                    font-weight: 600;
-                    margin-bottom: 0.75rem;
-                    padding-bottom: 0.5rem;
-                    border-bottom: 1px solid var(--border);
-                }
-
-                .score-row {
-                    display: flex;
-                    align-items: center;
-                    gap: 1rem;
-                    margin-bottom: 0.75rem;
-                }
-
-                .score-row label {
-                    flex: 1;
-                    font-size: 0.85rem;
-                    color: var(--text-dim);
-                }
-
-                .score-row input[type="range"] {
-                    flex: 2;
-                }
-
-                .score-value {
-                    width: 30px;
+                    margin-bottom: 1.5rem;
                     text-align: center;
-                    font-weight: 600;
                 }
 
-                .overall-score {
-                    margin-top: 0.75rem;
-                    padding-top: 0.75rem;
-                    border-top: 1px solid var(--border);
-                    text-align: right;
-                    font-size: 0.95rem;
+                .scoring-info p {
+                    margin: 0;
+                    color: var(--accent);
+                    font-size: 0.9rem;
                 }
 
                 .btn-save-test {
@@ -327,6 +213,10 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                     font-weight: 600;
                     cursor: pointer;
                     transition: transform 0.2s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 0.5rem;
                 }
 
                 .btn-save-test:hover:not(:disabled) {
@@ -336,6 +226,11 @@ export function ResearchPanel({ onSaveTest, results, imageUrl }) {
                 .btn-save-test:disabled {
                     opacity: 0.5;
                     cursor: not-allowed;
+                }
+
+                .score-count {
+                    font-size: 0.85rem;
+                    opacity: 0.9;
                 }
 
                 .hint-text {

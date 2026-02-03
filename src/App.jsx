@@ -3,6 +3,7 @@ import './index.css';
 import { MODELS, ReplicateService } from './services/replicate';
 import { ResearchPanel } from './components/ResearchPanel';
 import { TestHistory } from './components/TestHistory';
+import { ModelScoreCard } from './components/ModelScoreCard';
 import { testDB } from './services/testDatabase';
 
 function App() {
@@ -12,6 +13,8 @@ function App() {
     const [results, setResults] = useState({});
     const [showSettings, setShowSettings] = useState(!apiKey);
     const [showHistory, setShowHistory] = useState(false);
+    const [scores, setScores] = useState({});
+    const [showScoring, setShowScoring] = useState(false);
 
     // Manual Removal State
     const [manualColor, setManualColor] = useState(null);
@@ -176,6 +179,23 @@ function App() {
 
     const handleSaveTest = (testData) => {
         testDB.createTest(testData);
+        // Clear scores after saving
+        setScores({});
+        setShowScoring(false);
+    };
+
+    const handleScoreChange = (modelId, newScore) => {
+        setScores(prev => ({
+            ...prev,
+            [modelId]: { ...newScore, overall: calculateOverall(newScore) }
+        }));
+    };
+
+    const calculateOverall = (score) => {
+        const metrics = ['edgeAccuracy', 'detailPreservation', 'transparency'];
+        const values = metrics.map(m => score[m] || 0).filter(v => v > 0);
+        if (values.length === 0) return 0;
+        return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
     };
 
     return (
@@ -326,6 +346,14 @@ function App() {
                                     <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem' }}>Waiting...</div>
                                 )}
                             </div>
+
+                            <ModelScoreCard
+                                modelId={model.id}
+                                modelName={model.name}
+                                score={scores[model.id]}
+                                onScoreChange={handleScoreChange}
+                                showScoring={showScoring && results[model.id]?.output}
+                            />
                         </div>
                     ))}
                 </div>
@@ -333,8 +361,11 @@ function App() {
                 {imageUrl && Object.keys(results).length > 0 && (
                     <ResearchPanel
                         onSaveTest={handleSaveTest}
+                        scores={scores}
                         results={results}
                         imageUrl={imageUrl}
+                        showScoring={showScoring}
+                        onToggleScoring={() => setShowScoring(!showScoring)}
                     />
                 )}
             </main>
