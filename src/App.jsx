@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import './index.css';
 import { MODELS, ReplicateService } from './services/replicate';
+import { ResearchPanel } from './components/ResearchPanel';
+import { TestHistory } from './components/TestHistory';
+import { testDB } from './services/testDatabase';
 
 function App() {
     const [apiKey, setApiKey] = useState(localStorage.getItem('replicate_api_key') || '');
@@ -8,6 +11,7 @@ function App() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [results, setResults] = useState({});
     const [showSettings, setShowSettings] = useState(!apiKey);
+    const [showHistory, setShowHistory] = useState(false);
 
     // Manual Removal State
     const [manualColor, setManualColor] = useState(null);
@@ -170,13 +174,22 @@ function App() {
         setShowSettings(false);
     };
 
+    const handleSaveTest = (testData) => {
+        testDB.createTest(testData);
+    };
+
     return (
         <div className="app-container">
             <header>
                 <div className="logo">BG Compare Pro</div>
-                <button className="settings-btn" onClick={() => setShowSettings(true)}>
-                    Settings
-                </button>
+                <div className="header-buttons">
+                    <button className="settings-btn" onClick={() => setShowHistory(true)}>
+                        📚 Test Database
+                    </button>
+                    <button className="settings-btn" onClick={() => setShowSettings(true)}>
+                        Settings
+                    </button>
+                </div>
             </header>
 
             <main>
@@ -316,6 +329,14 @@ function App() {
                         </div>
                     ))}
                 </div>
+
+                {imageUrl && Object.keys(results).length > 0 && (
+                    <ResearchPanel
+                        onSaveTest={handleSaveTest}
+                        results={results}
+                        imageUrl={imageUrl}
+                    />
+                )}
             </main>
 
             {showSettings && (
@@ -354,6 +375,10 @@ function App() {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {showHistory && (
+                <TestHistory onClose={() => setShowHistory(false)} />
             )}
         </div>
     );

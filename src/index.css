@@ -7,6 +7,13 @@
     --success: #22c55e;
     --error: #ef4444;
     --loading: #38bdf8;
+
+    /* Aliases for components */
+    --bg: var(--bg-color);
+    --card: var(--card-bg);
+    --accent: var(--accent-color);
+    --text: var(--text-primary);
+    --border: rgba(255, 255, 255, 0.1);
 }
 
 * {
@@ -46,6 +53,12 @@ header {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -0.02em;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
 }
 
 .settings-btn {
