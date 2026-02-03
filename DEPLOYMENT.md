@@ -60,10 +60,30 @@ This guide will help you deploy the Replicate BG Comparison app to Railway.
 
 6. Add a domain in the Railway dashboard settings
 
-## Important Notes
+## Environment Variables (Optional)
 
-- **No environment variables needed on Railway** - Users will enter their Replicate API key directly in the web interface
-- The app stores API keys in browser localStorage for convenience
+You can optionally set a server-side API key in Railway so all users share the same key:
+
+1. Go to your Railway project dashboard
+2. Click on your deployment
+3. Go to "Variables" tab
+4. Add a new variable:
+   - **Name:** `REPLICATE_API_KEY`
+   - **Value:** `r8_your_api_key_here`
+
+If set, users won't need to enter their own API key - the app will use the server-side key automatically.
+
+**Important:** If you set a server-side key, all API usage will be billed to your Replicate account.
+
+## Without Environment Variables
+
+If no server-side API key is set:
+- Users will enter their own Replicate API key in the web interface
+- Keys are stored in browser localStorage for convenience
+- Each user's API usage is billed to their own Replicate account
+
+## Technical Notes
+
 - The Express server proxies all Replicate API requests to avoid CORS issues
 
 ## Project Structure

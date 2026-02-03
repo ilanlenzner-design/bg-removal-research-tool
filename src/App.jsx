@@ -11,10 +11,31 @@ function App() {
     const [imageUrl, setImageUrl] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [results, setResults] = useState({});
-    const [showSettings, setShowSettings] = useState(!apiKey);
+    const [showSettings, setShowSettings] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [scores, setScores] = useState({});
     const [showScoring, setShowScoring] = useState(false);
+    const [hasServerKey, setHasServerKey] = useState(false);
+
+    // Fetch server API key on mount
+    React.useEffect(() => {
+        fetch('/api/config')
+            .then(res => res.json())
+            .then(config => {
+                if (config.apiKey) {
+                    setApiKey(config.apiKey);
+                    setHasServerKey(true);
+                } else if (!apiKey) {
+                    setShowSettings(true);
+                }
+            })
+            .catch(err => {
+                console.error('Failed to fetch config:', err);
+                if (!apiKey) {
+                    setShowSettings(true);
+                }
+            });
+    }, []);
 
     // Manual Removal State
     const [manualColor, setManualColor] = useState(null);
@@ -374,9 +395,15 @@ function App() {
                 <div className="modal-overlay">
                     <div className="modal-content">
                         <h3>API Settings</h3>
-                        <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem', margin: '0.5rem 0 1.5rem 0' }}>
-                            Enter your Replicate API key to get started.
-                        </p>
+                        {hasServerKey ? (
+                            <p style={{ color: 'var(--success)', fontSize: '0.8rem', margin: '0.5rem 0 1.5rem 0' }}>
+                                ✓ Using server-configured API key. You're ready to go!
+                            </p>
+                        ) : (
+                            <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem', margin: '0.5rem 0 1.5rem 0' }}>
+                                Enter your Replicate API key to get started.
+                            </p>
+                        )}
                         <div className="input-group">
                             <label>Replicate API Token</label>
                             <input

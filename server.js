@@ -12,6 +12,14 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'dist')));
 
+// API Key endpoint - provides server-side API key if set
+app.get('/api/config', (req, res) => {
+    res.json({
+        apiKey: process.env.REPLICATE_API_KEY || null,
+        hasServerKey: !!process.env.REPLICATE_API_KEY
+    });
+});
+
 // Proxy for Replicate API
 app.all('/replicate/*', async (req, res) => {
     const replicatePath = req.path.replace('/replicate', '');
