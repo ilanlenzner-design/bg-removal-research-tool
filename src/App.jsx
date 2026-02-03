@@ -128,8 +128,11 @@ function App() {
 
         // Auto-run analysis and scoring after results complete
         // Use setTimeout to ensure state has updated
+        console.log('[AUTO-ANALYSIS] Scheduling auto-analysis in 1.5s...');
         setTimeout(() => {
+            console.log('[AUTO-ANALYSIS] Timeout triggered, calling autoAnalyzeAndScore...');
             setResults(currentResults => {
+                console.log('[AUTO-ANALYSIS] Current results:', currentResults);
                 autoAnalyzeAndScore(currentResults);
                 return currentResults;
             });
@@ -137,8 +140,13 @@ function App() {
     };
 
     const autoAnalyzeAndScore = async (completedResults) => {
+        console.log('[AUTO-ANALYSIS] Function called with results:', completedResults);
+        console.log('[AUTO-ANALYSIS] Image URL:', imageUrl);
+        console.log('[AUTO-ANALYSIS] API Key present:', !!apiKey);
+
         try {
             // Step 1: Analyze the original image
+            console.log('[AUTO-ANALYSIS] Calling /api/analyze-image...');
             const analysisResponse = await fetch('/api/analyze-image', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -148,59 +156,68 @@ function App() {
                 })
             });
 
+            console.log('[AUTO-ANALYSIS] Analysis response status:', analysisResponse.status);
+
             if (analysisResponse.ok) {
                 const data = await analysisResponse.json();
+                console.log('[AUTO-ANALYSIS] Analysis received:', data.analysis);
                 // Store analysis in a ref or state that ResearchPanel can access
                 window.__imageAnalysis = data.analysis;
+            } else {
+                console.error('[AUTO-ANALYSIS] Analysis failed with status:', analysisResponse.status);
             }
 
-            // Step 2: Score each result
-            const scoringPromises = MODELS.map(async (model) => {
+            // Step 2: Score all results comparatively
+            console.log('[AUTO-ANALYSIS] Starting comparative scoring for', MODELS.length, 'models...');
+
+            // Build results object with all model URLs
+            const resultsForScoring = {};
+            MODELS.forEach(model => {
                 const result = completedResults[model.id];
-                if (!result?.output) return null;
+                if (result?.output) {
+                    const resultUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+                    resultsForScoring[model.id] = resultUrl;
+                }
+            });
 
-                const resultUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+            try {
+                const scoreResponse = await fetch('/api/score-all-results', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        results: resultsForScoring,
+                        replicateApiKey: apiKey
+                    })
+                });
 
-                try {
-                    const scoreResponse = await fetch('/api/score-result', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            resultUrl,
-                            modelName: model.name,
-                            replicateApiKey: apiKey
-                        })
+                if (scoreResponse.ok) {
+                    const data = await scoreResponse.json();
+                    console.log('[AUTO-ANALYSIS] Comparative scores received:', data.scores);
+
+                    // Add overall scores
+                    const newScores = {};
+                    Object.entries(data.scores).forEach(([modelId, scores]) => {
+                        newScores[modelId] = {
+                            ...scores,
+                            overall: calculateOverall(scores)
+                        };
                     });
 
-                    if (scoreResponse.ok) {
-                        const data = await scoreResponse.json();
-                        return { modelId: model.id, scores: data.scores };
+                    console.log('[AUTO-ANALYSIS] New scores to set:', newScores);
+
+                    if (Object.keys(newScores).length > 0) {
+                        setScores(newScores);
+                        setShowScoring(true);
+                        console.log('[AUTO-ANALYSIS] Scores set successfully!');
+                    } else {
+                        console.warn('[AUTO-ANALYSIS] No scores to set');
                     }
-                } catch (err) {
-                    console.error(`Failed to score ${model.name}:`, err);
                 }
-                return null;
-            });
-
-            const scoringResults = await Promise.all(scoringPromises);
-
-            // Populate scores
-            const newScores = {};
-            scoringResults.forEach(result => {
-                if (result) {
-                    newScores[result.modelId] = {
-                        ...result.scores,
-                        overall: calculateOverall(result.scores)
-                    };
-                }
-            });
-
-            if (Object.keys(newScores).length > 0) {
-                setScores(newScores);
-                setShowScoring(true);
+            } catch (err) {
+                console.error('[AUTO-ANALYSIS] Scoring failed:', err);
             }
         } catch (error) {
-            console.error('Auto-analysis failed:', error);
+            console.error('[AUTO-ANALYSIS] Failed with error:', error);
         }
     };
 
@@ -339,7 +356,7 @@ function App() {
         <div className="app-container">
             <header>
                 <div className="logo">
-                    BG Compare Pro <span style={{ fontSize: '0.6em', opacity: 0.6, fontWeight: 'normal' }}>v2.1-live</span>
+                    BG Compare Pro <span style={{ color: 'yellow', fontSize: '1em', marginLeft: '10px' }}>v2.1-live</span>
                 </div>
                 <div className="header-buttons">
                     <button className="settings-btn" onClick={() => setShowHistory(true)}>

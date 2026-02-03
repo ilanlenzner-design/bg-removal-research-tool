@@ -14,11 +14,38 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
 
     // Auto-populate analysis from auto-run
     React.useEffect(() => {
+        // Check immediately on mount/results change
         if (window.__imageAnalysis && !imageAnalysis) {
+            console.log('[ResearchPanel] Found analysis, populating:', window.__imageAnalysis);
             setImageAnalysis(window.__imageAnalysis);
             delete window.__imageAnalysis;
+            return;
         }
-    }, [hasResults]);
+
+        // Poll for window.__imageAnalysis for up to 60 seconds after results appear
+        if (!hasResults) return;
+
+        let pollCount = 0;
+        const maxPolls = 120; // 120 * 500ms = 60 seconds
+
+        console.log('[ResearchPanel] Starting poll for analysis...');
+        const pollInterval = setInterval(() => {
+            if (window.__imageAnalysis) {
+                console.log('[ResearchPanel] Poll found analysis:', window.__imageAnalysis);
+                setImageAnalysis(window.__imageAnalysis);
+                delete window.__imageAnalysis;
+                clearInterval(pollInterval);
+            }
+
+            pollCount++;
+            if (pollCount >= maxPolls) {
+                console.log('[ResearchPanel] Poll timeout after', maxPolls, 'attempts');
+                clearInterval(pollInterval);
+            }
+        }, 500);
+
+        return () => clearInterval(pollInterval);
+    }, [hasResults, imageAnalysis]);
 
     const analyzeImage = async () => {
         if (!replicateApiKey) {
@@ -149,20 +176,18 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                                 onClick={analyzeImage}
                                 disabled={isAnalyzing}
                             >
-                                {isAnalyzing ? 'Analyzing...' : 'Analyze Image'}
+                                {isAnalyzing ? 'Analyzing...' : 'Re-analyze'}
                             </button>
                         </div>
-                        {imageAnalysis && (
-                            <textarea
-                                value={imageAnalysis}
-                                onChange={(e) => setImageAnalysis(e.target.value)}
-                                className="analysis-text"
-                                rows="6"
-                                placeholder="AI analysis will appear here..."
-                            />
-                        )}
+                        <textarea
+                            value={imageAnalysis}
+                            onChange={(e) => setImageAnalysis(e.target.value)}
+                            className="analysis-text"
+                            rows="6"
+                            placeholder="AI analysis will appear here automatically after comparison..."
+                        />
                         <p className="analysis-hint">
-                            Analysis and scoring happen automatically after comparison completes. You can re-run analysis here if needed.
+                            Analysis and scoring happen automatically after comparison completes.
                         </p>
                     </div>
                 )}
