@@ -2,19 +2,25 @@
 // Set this to your Google Apps Script web app URL after deployment
 // Or leave as empty string to use the local/Render server
 
-// Using Google Apps Script backend:
-export const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwLqUrcQc6CnlJUMNf01Aw2fOU4NvH_8Wk1v4eT_g1bevHMuiBtv3jAwfaCkfliwf7YQQ/exec';
+// Using Google Apps Script backend (CORS issues with POST - not working):
+// export const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwLqUrcQc6CnlJUMNf01Aw2fOU4NvH_8Wk1v4eT_g1bevHMuiBtv3jAwfaCkfliwf7YQQ/exec';
 
-// For local/Render server, use:
-// export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// Using Render backend (recommended - has CORS support):
+export const API_BASE_URL = 'https://replicate-bg-comparison.onrender.com';
 
 // Helper function to build API URLs
 export function getApiUrl(path) {
   if (API_BASE_URL) {
-    // Google Apps Script - use query parameter
-    return `${API_BASE_URL}?path=${path}`;
+    // Check if it's Google Apps Script or Render
+    if (API_BASE_URL.includes('script.google.com')) {
+      // Google Apps Script - use query parameter
+      return `${API_BASE_URL}?path=${path}`;
+    } else {
+      // Render or other server - use regular path
+      return `${API_BASE_URL}/api/${path}`;
+    }
   } else {
-    // Local/Render server - use regular path
+    // Local server - use relative path
     return `/api/${path}`;
   }
 }
