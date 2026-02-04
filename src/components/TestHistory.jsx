@@ -2,21 +2,32 @@ import React, { useState } from 'react';
 import { TEST_CATEGORIES, testDB } from '../services/testDatabase';
 
 export function TestHistory({ onClose }) {
-    const [tests, setTests] = useState(testDB.getTests());
+    const [tests, setTests] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState('');
     const [selectedTest, setSelectedTest] = useState(null);
     const [view, setView] = useState('list'); // 'list' or 'analytics'
+    const [stats, setStats] = useState({ totalTests: 0, byCategory: {}, avgScores: {} });
 
-    const stats = testDB.getStats();
+    // Load tests on mount
+    React.useEffect(() => {
+        loadData();
+    }, []);
+
+    const loadData = async () => {
+        await testDB.loadTests();
+        setTests(testDB.getTests());
+        const statsData = await testDB.getStats();
+        setStats(statsData);
+    };
 
     const filteredTests = selectedCategory
         ? tests.filter(t => t.category === selectedCategory)
         : tests;
 
-    const handleDelete = (testId) => {
+    const handleDelete = async (testId) => {
         if (confirm('Delete this test? This cannot be undone.')) {
-            testDB.deleteTest(testId);
-            setTests(testDB.getTests());
+            await testDB.deleteTest(testId);
+            await loadData(); // Reload data from server
             if (selectedTest?.id === testId) {
                 setSelectedTest(null);
             }
@@ -112,6 +123,9 @@ export function TestHistory({ onClose }) {
                             </select>
 
                             <div className="export-btns">
+                                <button onClick={loadData} className="export-btn" style={{ background: 'var(--accent)', color: 'white' }}>
+                                    🔄 Refresh
+                                </button>
                                 <button onClick={handleExportJSON} className="export-btn">
                                     Export JSON
                                 </button>

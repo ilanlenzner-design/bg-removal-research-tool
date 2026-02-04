@@ -317,12 +317,17 @@ function App() {
         setShowSettings(false);
     };
 
-    const handleSaveTest = (testData) => {
-        testDB.createTest(testData);
-        // Clear scores after saving
-        setScores({});
-        setShowScoring(false);
-        setIsSaved(true); // Mark as saved
+    const handleSaveTest = async (testData) => {
+        try {
+            await testDB.createTest(testData);
+            // Clear scores after saving
+            setScores({});
+            setShowScoring(false);
+            setIsSaved(true); // Mark as saved
+        } catch (err) {
+            console.error('Failed to save test:', err);
+            alert('Failed to save test. Please try again.');
+        }
     };
 
     const handleScoreChange = (modelId, newScore) => {

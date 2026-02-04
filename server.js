@@ -2,9 +2,31 @@ import express from 'express';
 import fetch from 'node-fetch';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Database helper functions
+const DB_PATH = path.join(__dirname, 'data.json');
+
+async function readDB() {
+    try {
+        const data = await fs.readFile(DB_PATH, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            // File doesn't exist, create it
+            await fs.writeFile(DB_PATH, '[]', 'utf8');
+            return [];
+        }
+        throw err;
+    }
+}
+
+async function writeDB(data) {
+    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -336,6 +358,115 @@ Transparency: [number 1-10]`;
     } catch (error) {
         console.error('Scoring error:', error);
         res.status(500).json({ error: 'Scoring failed' });
+    }
+});
+
+// Database API endpoints
+
+// GET all tests
+app.get('/api/tests', async (req, res) => {
+    try {
+        const tests = await readDB();
+        res.json(tests);
+    } catch (error) {
+        console.error('Failed to read tests:', error);
+        res.status(500).json({ error: 'Failed to read tests' });
+    }
+});
+
+// POST new test
+app.post('/api/tests', async (req, res) => {
+    try {
+        const tests = await readDB();
+        const newTest = {
+            id: Date.now().toString(),
+            timestamp: new Date().toISOString(),
+            ...req.body
+        };
+        tests.unshift(newTest); // Add to beginning
+        await writeDB(tests);
+        res.json(newTest);
+    } catch (error) {
+        console.error('Failed to save test:', error);
+        res.status(500).json({ error: 'Failed to save test' });
+    }
+});
+
+// PUT update test
+app.put('/api/tests/:id', async (req, res) => {
+    try {
+        const tests = await readDB();
+        const index = tests.findIndex(t => t.id === req.params.id);
+        if (index === -1) {
+            return res.status(404).json({ error: 'Test not found' });
+        }
+        tests[index] = { ...tests[index], ...req.body };
+        await writeDB(tests);
+        res.json(tests[index]);
+    } catch (error) {
+        console.error('Failed to update test:', error);
+        res.status(500).json({ error: 'Failed to update test' });
+    }
+});
+
+// DELETE test
+app.delete('/api/tests/:id', async (req, res) => {
+    try {
+        const tests = await readDB();
+        const filtered = tests.filter(t => t.id !== req.params.id);
+        if (filtered.length === tests.length) {
+            return res.status(404).json({ error: 'Test not found' });
+        }
+        await writeDB(filtered);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Failed to delete test:', error);
+        res.status(500).json({ error: 'Failed to delete test' });
+    }
+});
+
+// GET database stats
+app.get('/api/tests/stats', async (req, res) => {
+    try {
+        const tests = await readDB();
+
+        const stats = {
+            totalTests: tests.length,
+            byCategory: {},
+            modelPerformance: {},
+            avgScores: {}
+        };
+
+        // Count by category
+        tests.forEach(test => {
+            if (test.category) {
+                stats.byCategory[test.category] = (stats.byCategory[test.category] || 0) + 1;
+            }
+        });
+
+        // Calculate average scores per model
+        const modelScores = {};
+        tests.forEach(test => {
+            Object.keys(test.scores || {}).forEach(modelId => {
+                if (!modelScores[modelId]) {
+                    modelScores[modelId] = [];
+                }
+                const score = test.scores[modelId];
+                if (score && score.overall) {
+                    modelScores[modelId].push(score.overall);
+                }
+            });
+        });
+
+        Object.keys(modelScores).forEach(modelId => {
+            const scores = modelScores[modelId];
+            stats.avgScores[modelId] = scores.reduce((a, b) => a + b, 0) / scores.length;
+        });
+
+        res.json(stats);
+    } catch (error) {
+        console.error('Failed to get stats:', error);
+        res.status(500).json({ error: 'Failed to get stats' });
     }
 });
 

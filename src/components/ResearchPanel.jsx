@@ -78,7 +78,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!category || !testName) {
             alert('Please fill in test category and name');
             return;
@@ -94,15 +94,19 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
             imageUrl
         };
 
-        onSaveTest(testData);
+        try {
+            await onSaveTest(testData);
 
-        // Reset form
-        setCategory('');
-        setTestName('');
-        setNotes('');
-        setImageAnalysis('');
+            // Reset form
+            setCategory('');
+            setTestName('');
+            setNotes('');
+            setImageAnalysis('');
 
-        alert('Test saved successfully!');
+            alert('Test saved successfully!');
+        } catch (err) {
+            alert('Failed to save test. Please try again.');
+        }
     };
 
     return (
