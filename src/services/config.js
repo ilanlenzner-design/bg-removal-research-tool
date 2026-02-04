@@ -3,7 +3,7 @@
 // Or leave as empty string to use the local/Render server
 
 // Using Google Apps Script backend:
-export const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwTcsiAOGKXsH6_huDRZhtyZ1vSqAv4EuZU2XAVPPpLPFK1XPxO25v8V5i5LpMixlHV4A/exec';
+export const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwLqUrcQc6CnlJUMNf01Aw2fOU4NvH_8Wk1v4eT_g1bevHMuiBtv3jAwfaCkfliwf7YQQ/exec';
 
 // For local/Render server, use:
 // export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
