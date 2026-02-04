@@ -37,25 +37,35 @@ async function proxyToGoogleScript(path, method = 'GET', body = null) {
 }
 
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'dist'), {
+    etag: false,
+    maxAge: 0,
+    setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+    }
+}));
 
 // API Key endpoint - provides server-side API key if set
 app.get('/api/config', (req, res) => {
     res.json({
         apiKey: process.env.REPLICATE_API_KEY || null,
-        hasServerKey: !!process.env.REPLICATE_API_KEY
+        hasServerKey: !!process.env.REPLICATE_API_KEY,
+        geminiApiKey: process.env.GEMINI_API_KEY || null,
+        hasGeminiKey: !!process.env.GEMINI_API_KEY
     });
 });
 
-// Image analysis endpoint - uses Replicate vision model
+// Image analysis endpoint - uses Google Gemini vision model
 app.post('/api/analyze-image', async (req, res) => {
     try {
-        const { imageUrl, replicateApiKey } = req.body;
-        const apiKey = replicateApiKey || process.env.REPLICATE_API_KEY;
+        const { imageUrl, geminiApiKey } = req.body;
+        const apiKey = geminiApiKey || process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
             return res.status(400).json({
-                error: 'Replicate API key not provided'
+                error: 'Gemini API key not provided'
             });
         }
 
@@ -70,55 +80,44 @@ app.post('/api/analyze-image', async (req, res) => {
 
 Keep under 150 words, be concise and specific.`;
 
-        // Create prediction with LLaVA vision model
-        const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+        // Fetch image as base64
+        const imageResponse = await fetch(imageUrl);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+
+        // Use Gemini 2.0 Flash for vision analysis
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
-                'Authorization': `Token ${apiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                version: '2facb4a474a0462c15041b78b1ad70952ea46b5ec6ad29583c0b29dbd4249591', // llava-13b
-                input: {
-                    image: imageUrl,
-                    prompt: prompt,
-                    max_tokens: 500
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        {
+                            inline_data: {
+                                mime_type: imageResponse.headers.get('content-type') || 'image/jpeg',
+                                data: imageBase64
+                            }
+                        }
+                    ]
+                }],
+                generationConfig: {
+                    maxOutputTokens: 500,
+                    temperature: 0.4
                 }
             })
         });
 
-        if (!createResponse.ok) {
-            const error = await createResponse.text();
-            console.error('Replicate API error:', error);
-            return res.status(createResponse.status).json({ error: 'Failed to create analysis' });
+        if (!geminiResponse.ok) {
+            const error = await geminiResponse.text();
+            console.error('Gemini API error:', error);
+            return res.status(geminiResponse.status).json({ error: 'Failed to analyze image with Gemini' });
         }
 
-        let prediction = await createResponse.json();
-
-        // Poll for result
-        while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-                headers: {
-                    'Authorization': `Token ${apiKey}`,
-                }
-            });
-
-            if (!statusResponse.ok) {
-                throw new Error('Failed to check prediction status');
-            }
-
-            prediction = await statusResponse.json();
-        }
-
-        if (prediction.status === 'failed') {
-            return res.status(500).json({ error: 'Analysis failed' });
-        }
-
-        const analysis = Array.isArray(prediction.output)
-            ? prediction.output.join('')
-            : prediction.output;
+        const result = await geminiResponse.json();
+        const analysis = result.candidates?.[0]?.content?.parts?.[0]?.text || 'Analysis failed';
 
         res.json({ analysis });
     } catch (error) {

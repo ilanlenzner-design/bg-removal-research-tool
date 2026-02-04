@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { TEST_CATEGORIES } from '../services/testDatabase';
 import { getApiUrl } from '../services/config';
 
-export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring, isSaved, replicateApiKey, onAutoScore }) {
+export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring, isSaved, replicateApiKey, geminiApiKey, onAutoScore }) {
     const [category, setCategory] = useState('');
     const [testName, setTestName] = useState('');
     const [notes, setNotes] = useState('');
@@ -49,8 +49,8 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
     }, [hasResults, imageAnalysis]);
 
     const analyzeImage = async () => {
-        if (!replicateApiKey) {
-            alert('Replicate API key not available. Please enter your API key in settings.');
+        if (!geminiApiKey) {
+            alert('Gemini API key not available. Please enter your API key in settings.');
             return;
         }
 
@@ -61,7 +61,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    replicateApiKey
+                    geminiApiKey
                 })
             });
 
@@ -171,7 +171,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
                 </div>
 
                 {/* AI Image Analysis */}
-                {imageUrl && replicateApiKey && (
+                {imageUrl && geminiApiKey && (
                     <div className="analysis-section">
                         <div className="analysis-header">
                             <label>🤖 AI Image Analysis</label>

@@ -9,6 +9,7 @@ import { getApiUrl } from './services/config';
 
 function App() {
     const [apiKey, setApiKey] = useState(localStorage.getItem('replicate_api_key') || '');
+    const [geminiApiKey, setGeminiApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
     const [imageUrl, setImageUrl] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [results, setResults] = useState({});
@@ -17,9 +18,10 @@ function App() {
     const [scores, setScores] = useState({});
     const [showScoring, setShowScoring] = useState(false);
     const [hasServerKey, setHasServerKey] = useState(false);
+    const [hasGeminiKey, setHasGeminiKey] = useState(false);
     const [isSaved, setIsSaved] = useState(true);
 
-    // Fetch server API key on mount
+    // Fetch server API keys on mount
     React.useEffect(() => {
         fetch(getApiUrl('config'))
             .then(res => res.json())
@@ -27,7 +29,12 @@ function App() {
                 if (config.apiKey) {
                     setApiKey(config.apiKey);
                     setHasServerKey(true);
-                } else if (!apiKey) {
+                }
+                if (config.geminiApiKey) {
+                    setGeminiApiKey(config.geminiApiKey);
+                    setHasGeminiKey(true);
+                }
+                if (!apiKey && !config.apiKey) {
                     setShowSettings(true);
                 }
             })
@@ -143,17 +150,17 @@ function App() {
     const autoAnalyzeAndScore = async (completedResults) => {
         console.log('[AUTO-ANALYSIS] Function called with results:', completedResults);
         console.log('[AUTO-ANALYSIS] Image URL:', imageUrl);
-        console.log('[AUTO-ANALYSIS] API Key present:', !!apiKey);
+        console.log('[AUTO-ANALYSIS] Gemini API Key present:', !!geminiApiKey);
 
         try {
-            // Step 1: Analyze the original image
-            console.log('[AUTO-ANALYSIS] Calling analyze-image...');
+            // Step 1: Analyze the original image with Gemini
+            console.log('[AUTO-ANALYSIS] Calling analyze-image with Gemini...');
             const analysisResponse = await fetch(getApiUrl('analyze-image'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     imageUrl,
-                    replicateApiKey: apiKey
+                    geminiApiKey
                 })
             });
 
@@ -542,6 +549,7 @@ function App() {
                         onToggleScoring={() => setShowScoring(!showScoring)}
                         isSaved={isSaved}
                         replicateApiKey={apiKey}
+                        geminiApiKey={geminiApiKey}
                         onAutoScore={handleAutoScore}
                     />
                 )}
