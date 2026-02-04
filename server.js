@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Google Apps Script URL for database operations
-const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbwLqUrcQc6CnlJUMNf01Aw2fOU4NvH_8Wk1v4eT_g1bevHMuiBtv3jAwfaCkfliwf7YQQ/exec';
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbxx5QFDcY83FZvoPmYHueMj7V7tSqX3X6iMPwcCOpEZwbaeJAO4Yldd-prIPjESxy1bKw/exec';
 
 // Helper to proxy requests to Google Apps Script
 async function proxyToGoogleScript(path, method = 'GET', body = null) {

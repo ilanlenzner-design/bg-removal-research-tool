@@ -91,8 +91,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
             notes,
             imageAnalysis,
             scores,
-            results,
-            imageUrl
+            results
         };
 
         try {

@@ -176,10 +176,16 @@ export class TestDatabase {
     }
 
     exportToJSON() {
+        // Clean tests - remove imageUrl and other unwanted fields
+        const cleanTests = this.tests.map(test => {
+            const { imageUrl, ...cleanTest } = test;
+            return cleanTest;
+        });
+
         const data = {
             version: '1.0',
             exportDate: new Date().toISOString(),
-            tests: this.tests
+            tests: cleanTests
         };
         return JSON.stringify(data, null, 2);
     }
@@ -235,43 +241,62 @@ export class TestDatabase {
     exportToCSV() {
         if (this.tests.length === 0) return '';
 
+        // Match the Google Sheets 21-column structure
         const headers = [
-            'Test ID',
-            'Date',
+            'ID',
+            'Timestamp',
             'Category',
             'Name',
             'Notes',
-            'AI Analysis',
-            'Model',
-            'Edge Accuracy',
-            'Detail Preservation',
-            'Transparency Quality',
-            'Overall Score',
-            'Processing Time (s)'
+            'Image Analysis',
+            '851 Labs Model',
+            '851 Labs Result URL',
+            '851 Labs Overall Score',
+            'Lucataco Model',
+            'Lucataco Result URL',
+            'Lucataco Overall Score',
+            'BRIA AI Model',
+            'BRIA AI Result URL',
+            'BRIA AI Overall Score',
+            'BiRefNet Model',
+            'BiRefNet Result URL',
+            'BiRefNet Overall Score',
+            'RemBG Model',
+            'RemBG Result URL',
+            'RemBG Overall Score'
+        ];
+
+        const modelOrder = [
+            '851-labs/background-remover',
+            'lucataco/remove-bg',
+            'bria/remove-background',
+            'men1scus/birefnet',
+            'cjwbw/rembg'
         ];
 
         const rows = [];
 
         this.tests.forEach(test => {
-            Object.keys(test.scores || {}).forEach(modelId => {
-                const score = test.scores[modelId];
-                const time = test.processingTimes[modelId];
+            const row = [
+                test.id,
+                new Date(test.timestamp).toISOString(),
+                test.category || '',
+                test.name || '',
+                (test.notes || '').replace(/"/g, '""'),
+                (test.imageAnalysis || '').replace(/"/g, '""')
+            ];
 
-                rows.push([
-                    test.id,
-                    new Date(test.timestamp).toLocaleDateString(),
-                    test.category,
-                    test.name || 'Untitled',
-                    (test.notes || '').replace(/"/g, '""'),
-                    (test.imageAnalysis || '').replace(/"/g, '""'),
-                    modelId,
-                    score?.edgeAccuracy || '',
-                    score?.detailPreservation || '',
-                    score?.transparency || '',
-                    score?.overall || '',
-                    time || ''
-                ].map(cell => `"${cell}"`).join(','));
+            // Add model data in order
+            modelOrder.forEach(modelId => {
+                const result = test.results?.[modelId];
+                const score = test.scores?.[modelId];
+
+                row.push(result?.name || '');
+                row.push(result?.output || '');
+                row.push(score?.overall || '');
             });
+
+            rows.push(row.map(cell => `"${cell}"`).join(','));
         });
 
         return [headers.join(','), ...rows].join('\n');
