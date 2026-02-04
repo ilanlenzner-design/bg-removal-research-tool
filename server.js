@@ -2,34 +2,39 @@ import express from 'express';
 import fetch from 'node-fetch';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database helper functions
-const DB_PATH = path.join(__dirname, 'data.json');
-
-async function readDB() {
-    try {
-        const data = await fs.readFile(DB_PATH, 'utf8');
-        return JSON.parse(data);
-    } catch (err) {
-        if (err.code === 'ENOENT') {
-            // File doesn't exist, create it
-            await fs.writeFile(DB_PATH, '[]', 'utf8');
-            return [];
-        }
-        throw err;
-    }
-}
-
-async function writeDB(data) {
-    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Google Apps Script URL for database operations
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbwLqUrcQc6CnlJUMNf01Aw2fOU4NvH_8Wk1v4eT_g1bevHMuiBtv3jAwfaCkfliwf7YQQ/exec';
+
+// Helper to proxy requests to Google Apps Script
+async function proxyToGoogleScript(path, method = 'GET', body = null) {
+    const url = `${GOOGLE_SCRIPT_URL}?path=${path}`;
+    const options = {
+        method: method === 'GET' ? 'GET' : 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    };
+
+    if (body && method !== 'GET') {
+        options.body = JSON.stringify(body);
+        if (method === 'PUT' || method === 'DELETE') {
+            options.headers['X-HTTP-Method-Override'] = method;
+        }
+    }
+
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        throw new Error(`Google Script request failed: ${response.statusText}`);
+    }
+    return response.json();
+}
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -361,12 +366,12 @@ Transparency: [number 1-10]`;
     }
 });
 
-// Database API endpoints
+// Database API endpoints - proxy to Google Apps Script
 
 // GET all tests
 app.get('/api/tests', async (req, res) => {
     try {
-        const tests = await readDB();
+        const tests = await proxyToGoogleScript('tests', 'GET');
         res.json(tests);
     } catch (error) {
         console.error('Failed to read tests:', error);
@@ -377,14 +382,7 @@ app.get('/api/tests', async (req, res) => {
 // POST new test
 app.post('/api/tests', async (req, res) => {
     try {
-        const tests = await readDB();
-        const newTest = {
-            id: Date.now().toString(),
-            timestamp: new Date().toISOString(),
-            ...req.body
-        };
-        tests.unshift(newTest); // Add to beginning
-        await writeDB(tests);
+        const newTest = await proxyToGoogleScript('tests', 'POST', req.body);
         res.json(newTest);
     } catch (error) {
         console.error('Failed to save test:', error);
@@ -395,14 +393,8 @@ app.post('/api/tests', async (req, res) => {
 // PUT update test
 app.put('/api/tests/:id', async (req, res) => {
     try {
-        const tests = await readDB();
-        const index = tests.findIndex(t => t.id === req.params.id);
-        if (index === -1) {
-            return res.status(404).json({ error: 'Test not found' });
-        }
-        tests[index] = { ...tests[index], ...req.body };
-        await writeDB(tests);
-        res.json(tests[index]);
+        const updatedTest = await proxyToGoogleScript(`tests/${req.params.id}`, 'PUT', req.body);
+        res.json(updatedTest);
     } catch (error) {
         console.error('Failed to update test:', error);
         res.status(500).json({ error: 'Failed to update test' });
@@ -412,13 +404,8 @@ app.put('/api/tests/:id', async (req, res) => {
 // DELETE test
 app.delete('/api/tests/:id', async (req, res) => {
     try {
-        const tests = await readDB();
-        const filtered = tests.filter(t => t.id !== req.params.id);
-        if (filtered.length === tests.length) {
-            return res.status(404).json({ error: 'Test not found' });
-        }
-        await writeDB(filtered);
-        res.json({ success: true });
+        const result = await proxyToGoogleScript(`tests/${req.params.id}`, 'DELETE');
+        res.json(result);
     } catch (error) {
         console.error('Failed to delete test:', error);
         res.status(500).json({ error: 'Failed to delete test' });
@@ -428,41 +415,7 @@ app.delete('/api/tests/:id', async (req, res) => {
 // GET database stats
 app.get('/api/tests/stats', async (req, res) => {
     try {
-        const tests = await readDB();
-
-        const stats = {
-            totalTests: tests.length,
-            byCategory: {},
-            modelPerformance: {},
-            avgScores: {}
-        };
-
-        // Count by category
-        tests.forEach(test => {
-            if (test.category) {
-                stats.byCategory[test.category] = (stats.byCategory[test.category] || 0) + 1;
-            }
-        });
-
-        // Calculate average scores per model
-        const modelScores = {};
-        tests.forEach(test => {
-            Object.keys(test.scores || {}).forEach(modelId => {
-                if (!modelScores[modelId]) {
-                    modelScores[modelId] = [];
-                }
-                const score = test.scores[modelId];
-                if (score && score.overall) {
-                    modelScores[modelId].push(score.overall);
-                }
-            });
-        });
-
-        Object.keys(modelScores).forEach(modelId => {
-            const scores = modelScores[modelId];
-            stats.avgScores[modelId] = scores.reduce((a, b) => a + b, 0) / scores.length;
-        });
-
+        const stats = await proxyToGoogleScript('tests/stats', 'GET');
         res.json(stats);
     } catch (error) {
         console.error('Failed to get stats:', error);
