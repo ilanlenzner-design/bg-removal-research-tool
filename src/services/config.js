@@ -2,11 +2,11 @@
 // Set this to your Google Apps Script web app URL after deployment
 // Or leave as empty string to use the local/Render server
 
-// For Google Apps Script, use:
-// export const API_BASE_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
+// Using Google Apps Script backend:
+export const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwTcsiAOGKXsH6_huDRZhtyZ1vSqAv4EuZU2XAVPPpLPFK1XPxO25v8V5i5LpMixlHV4A/exec';
 
 // For local/Render server, use:
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Helper function to build API URLs
 export function getApiUrl(path) {
