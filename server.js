@@ -69,8 +69,13 @@ app.post('/api/analyze-image', async (req, res) => {
             });
         }
 
-        const prompt = `Analyze this image for background removal purposes. Provide:
+        const prompt = `Analyze this image for background removal testing purposes. Provide your response in the following format:
 
+**TEST_NAME**: [A short, descriptive name for this test case (3-6 words max), e.g. "Orange cat with whiskers" or "Person with complex hair"]
+
+**NOTES**: [Brief testing notes - what to watch for, expected challenges, or interesting observations (1-2 sentences)]
+
+**ANALYSIS**:
 **Subject**: What's the main subject?
 **Style**: Photo/cartoon/illustration/3D?
 **Background**: Simple/complex/gradient/textured?
@@ -78,15 +83,15 @@ app.post('/api/analyze-image', async (req, res) => {
 **Challenges**: What makes BG removal difficult?
 **Recommended Category**: Portrait/E-commerce/Cartoon/Animals/Complex/Fine-Details/VFX/Transparent/Challenging
 
-Keep under 150 words, be concise and specific.`;
+Keep the analysis section under 150 words, be concise and specific.`;
 
         // Fetch image as base64
         const imageResponse = await fetch(imageUrl);
         const imageBuffer = await imageResponse.arrayBuffer();
         const imageBase64 = Buffer.from(imageBuffer).toString('base64');
 
-        // Use Gemini 2.0 Flash for vision analysis
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+        // Use Gemini 3 Pro Preview for vision analysis
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -104,7 +109,7 @@ Keep under 150 words, be concise and specific.`;
                     ]
                 }],
                 generationConfig: {
-                    maxOutputTokens: 500,
+                    maxOutputTokens: 2000,  // Increased for Gemini 3's thought process
                     temperature: 0.4
                 }
             })
@@ -117,37 +122,71 @@ Keep under 150 words, be concise and specific.`;
         }
 
         const result = await geminiResponse.json();
-        const analysis = result.candidates?.[0]?.content?.parts?.[0]?.text || 'Analysis failed';
+        const fullResponse = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-        res.json({ analysis });
+        // Parse the structured response
+        const testNameMatch = fullResponse.match(/\*\*TEST_NAME\*\*:\s*(.+?)(?=\n|$)/i);
+        const notesMatch = fullResponse.match(/\*\*NOTES\*\*:\s*(.+?)(?=\n\n|\*\*ANALYSIS\*\*)/is);
+        const analysisMatch = fullResponse.match(/\*\*ANALYSIS\*\*:\s*([\s\S]+?)$/i);
+
+        const suggestedTestName = testNameMatch ? testNameMatch[1].trim() : '';
+        const suggestedNotes = notesMatch ? notesMatch[1].trim().replace(/\n/g, ' ') : '';
+        const analysis = analysisMatch ? analysisMatch[1].trim() : fullResponse;
+
+        res.json({
+            analysis,
+            suggestedTestName,
+            suggestedNotes
+        });
     } catch (error) {
         console.error('Image analysis error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
 
-// Comparative scoring endpoint - scores all results together
+// Comparative scoring endpoint - scores all results together using Gemini 3
 app.post('/api/score-all-results', async (req, res) => {
     try {
-        const { results, replicateApiKey } = req.body;
-        const apiKey = replicateApiKey || process.env.REPLICATE_API_KEY;
+        const { results, geminiApiKey } = req.body;
+        const apiKey = geminiApiKey || process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
             return res.status(400).json({
-                error: 'Replicate API key not provided'
+                error: 'Gemini API key not provided'
             });
         }
 
-        // Build a prompt showing all results for comparison
-        const resultsList = Object.entries(results).map(([modelId, url], index) =>
-            `Result ${index + 1} (${modelId}): ${url}`
-        ).join('\n');
+        // Fetch all result images as base64
+        const modelIds = Object.keys(results);
+        const imageParts = [];
 
-        const prompt = `You are comparing ${Object.keys(results).length} background removal results side-by-side. RANK them from best to worst.
+        for (let i = 0; i < modelIds.length; i++) {
+            const modelId = modelIds[i];
+            const imageUrl = results[modelId];
 
-${resultsList}
+            try {
+                const imageResponse = await fetch(imageUrl);
+                const imageBuffer = await imageResponse.arrayBuffer();
+                const imageBase64 = Buffer.from(imageBuffer).toString('base64');
 
-Examine ALL results carefully and COMPARE them:
+                imageParts.push({
+                    inline_data: {
+                        mime_type: imageResponse.headers.get('content-type') || 'image/png',
+                        data: imageBase64
+                    }
+                });
+            } catch (err) {
+                console.error(`Failed to fetch image ${i + 1}:`, err);
+            }
+        }
+
+        // Build a prompt for comparative analysis
+        const prompt = `You are comparing ${modelIds.length} background removal results side-by-side. Each image is labeled Result 1 through Result ${modelIds.length}.
+
+Models being compared:
+${modelIds.map((id, idx) => `Result ${idx + 1}: ${id}`).join('\n')}
+
+Examine ALL images carefully and COMPARE them:
 - Which has the cleanest edges?
 - Which preserves the most detail?
 - Which has the best transparency?
@@ -159,60 +198,42 @@ IMPORTANT: Give DIFFERENT scores based on quality ranking:
 - Fourth: 5-6
 - Worst: 3-5
 
-For EACH result (1-${Object.keys(results).length}), provide scores:
+For EACH result (1-${modelIds.length}), provide scores:
 Result 1 - Edge: X, Detail: Y, Transparency: Z
 Result 2 - Edge: X, Detail: Y, Transparency: Z
 (continue for all results)`;
 
-        const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+        // Combine prompt and all images
+        const contentParts = [{ text: prompt }, ...imageParts];
+
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
-                'Authorization': `Token ${apiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                version: '2facb4a474a0462c15041b78b1ad70952ea46b5ec6ad29583c0b29dbd4249591',
-                input: {
-                    image: Object.values(results)[0], // Use first image as reference
-                    prompt: prompt,
-                    max_tokens: 300
+                contents: [{
+                    parts: contentParts
+                }],
+                generationConfig: {
+                    maxOutputTokens: 2000,
+                    temperature: 0.4
                 }
             })
         });
 
-        if (!createResponse.ok) {
-            throw new Error('Failed to create scoring prediction');
+        if (!geminiResponse.ok) {
+            const error = await geminiResponse.text();
+            console.error('Gemini API error:', error);
+            throw new Error('Failed to score with Gemini');
         }
 
-        let prediction = await createResponse.json();
+        const result = await geminiResponse.json();
+        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-        // Poll for result
-        while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-                headers: { 'Authorization': `Token ${apiKey}` }
-            });
-
-            if (!statusResponse.ok) {
-                throw new Error('Failed to check prediction status');
-            }
-
-            prediction = await statusResponse.json();
-        }
-
-        if (prediction.status === 'failed') {
-            throw new Error('Scoring failed');
-        }
-
-        const responseText = Array.isArray(prediction.output)
-            ? prediction.output.join('')
-            : prediction.output;
-
-        console.log('[COMPARATIVE SCORING] Raw AI response:', responseText);
+        console.log('[COMPARATIVE SCORING - GEMINI] Raw AI response:', responseText);
 
         // Parse scores for each result
-        const modelIds = Object.keys(results);
         const allScores = {};
 
         modelIds.forEach((modelId, index) => {
@@ -236,7 +257,7 @@ Result 2 - Edge: X, Detail: Y, Transparency: Z
             }
         });
 
-        console.log('[COMPARATIVE SCORING] Parsed scores:', allScores);
+        console.log('[COMPARATIVE SCORING - GEMINI] Parsed scores:', allScores);
 
         res.json({ scores: allScores });
     } catch (error) {
@@ -245,15 +266,15 @@ Result 2 - Edge: X, Detail: Y, Transparency: Z
     }
 });
 
-// Score individual result endpoint
+// Score individual result endpoint using Gemini 3
 app.post('/api/score-result', async (req, res) => {
     try {
-        const { resultUrl, modelName, replicateApiKey } = req.body;
-        const apiKey = replicateApiKey || process.env.REPLICATE_API_KEY;
+        const { resultUrl, modelName, geminiApiKey } = req.body;
+        const apiKey = geminiApiKey || process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
             return res.status(400).json({
-                error: 'Replicate API key not provided'
+                error: 'Gemini API key not provided'
             });
         }
 
@@ -292,59 +313,52 @@ Edge: [number 1-10]
 Detail: [number 1-10]
 Transparency: [number 1-10]`;
 
-        const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+        // Fetch image as base64
+        const imageResponse = await fetch(resultUrl);
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: {
-                'Authorization': `Token ${apiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                version: '2facb4a474a0462c15041b78b1ad70952ea46b5ec6ad29583c0b29dbd4249591',
-                input: {
-                    image: resultUrl,
-                    prompt: prompt,
-                    max_tokens: 100
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        {
+                            inline_data: {
+                                mime_type: imageResponse.headers.get('content-type') || 'image/png',
+                                data: imageBase64
+                            }
+                        }
+                    ]
+                }],
+                generationConfig: {
+                    maxOutputTokens: 2000,
+                    temperature: 0.4
                 }
             })
         });
 
-        if (!createResponse.ok) {
-            throw new Error('Failed to create scoring prediction');
+        if (!geminiResponse.ok) {
+            const error = await geminiResponse.text();
+            console.error('Gemini API error:', error);
+            throw new Error('Failed to score with Gemini');
         }
 
-        let prediction = await createResponse.json();
+        const result = await geminiResponse.json();
+        const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-        // Poll for result
-        while (prediction.status !== 'succeeded' && prediction.status !== 'failed') {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
-                headers: { 'Authorization': `Token ${apiKey}` }
-            });
-
-            if (!statusResponse.ok) {
-                throw new Error('Failed to check prediction status');
-            }
-
-            prediction = await statusResponse.json();
-        }
-
-        if (prediction.status === 'failed') {
-            throw new Error('Scoring failed');
-        }
-
-        const responseText = Array.isArray(prediction.output)
-            ? prediction.output.join('')
-            : prediction.output;
-
-        console.log(`[SCORING ${modelName}] Raw AI response:`, responseText);
+        console.log(`[SCORING - GEMINI ${modelName}] Raw AI response:`, responseText);
 
         // Parse scores from response
         const edgeMatch = responseText.match(/Edge[:\s]+(\d+)/i);
         const detailMatch = responseText.match(/Detail[:\s]+(\d+)/i);
         const transparencyMatch = responseText.match(/Transparency[:\s]+(\d+)/i);
 
-        console.log(`[SCORING ${modelName}] Parsed matches:`, {
+        console.log(`[SCORING - GEMINI ${modelName}] Parsed matches:`, {
             edge: edgeMatch?.[1],
             detail: detailMatch?.[1],
             transparency: transparencyMatch?.[1]
@@ -356,7 +370,7 @@ Transparency: [number 1-10]`;
             transparency: transparencyMatch ? parseInt(transparencyMatch[1]) : 7
         };
 
-        console.log(`[SCORING ${modelName}] Final scores:`, scores);
+        console.log(`[SCORING - GEMINI ${modelName}] Final scores:`, scores);
 
         res.json({ scores });
     } catch (error) {

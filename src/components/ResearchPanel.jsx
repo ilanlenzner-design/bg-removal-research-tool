@@ -13,17 +13,23 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
     const hasScores = Object.keys(scores).length > 0;
     const showUnsavedWarning = !isSaved && hasResults;
 
-    // Auto-populate analysis from auto-run
+    // Auto-populate analysis, test name, and notes from auto-run
     React.useEffect(() => {
         // Check immediately on mount/results change
-        if (window.__imageAnalysis && !imageAnalysis) {
-            console.log('[ResearchPanel] Found analysis, populating:', window.__imageAnalysis);
-            setImageAnalysis(window.__imageAnalysis);
-            delete window.__imageAnalysis;
+        if (window.__imageAnalysisData && !imageAnalysis) {
+            console.log('[ResearchPanel] Found analysis data, populating:', window.__imageAnalysisData);
+            setImageAnalysis(window.__imageAnalysisData.analysis || '');
+            if (window.__imageAnalysisData.suggestedTestName && !testName) {
+                setTestName(window.__imageAnalysisData.suggestedTestName);
+            }
+            if (window.__imageAnalysisData.suggestedNotes && !notes) {
+                setNotes(window.__imageAnalysisData.suggestedNotes);
+            }
+            delete window.__imageAnalysisData;
             return;
         }
 
-        // Poll for window.__imageAnalysis for up to 60 seconds after results appear
+        // Poll for window.__imageAnalysisData for up to 60 seconds after results appear
         if (!hasResults) return;
 
         let pollCount = 0;
@@ -31,10 +37,16 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
 
         console.log('[ResearchPanel] Starting poll for analysis...');
         const pollInterval = setInterval(() => {
-            if (window.__imageAnalysis) {
-                console.log('[ResearchPanel] Poll found analysis:', window.__imageAnalysis);
-                setImageAnalysis(window.__imageAnalysis);
-                delete window.__imageAnalysis;
+            if (window.__imageAnalysisData) {
+                console.log('[ResearchPanel] Poll found analysis data:', window.__imageAnalysisData);
+                setImageAnalysis(window.__imageAnalysisData.analysis || '');
+                if (window.__imageAnalysisData.suggestedTestName && !testName) {
+                    setTestName(window.__imageAnalysisData.suggestedTestName);
+                }
+                if (window.__imageAnalysisData.suggestedNotes && !notes) {
+                    setNotes(window.__imageAnalysisData.suggestedNotes);
+                }
+                delete window.__imageAnalysisData;
                 clearInterval(pollInterval);
             }
 
@@ -46,7 +58,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
         }, 500);
 
         return () => clearInterval(pollInterval);
-    }, [hasResults, imageAnalysis]);
+    }, [hasResults, imageAnalysis, testName, notes]);
 
     const analyzeImage = async () => {
         if (!geminiApiKey) {
@@ -70,7 +82,13 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
             }
 
             const data = await response.json();
-            setImageAnalysis(data.analysis);
+            setImageAnalysis(data.analysis || '');
+            if (data.suggestedTestName && !testName) {
+                setTestName(data.suggestedTestName);
+            }
+            if (data.suggestedNotes && !notes) {
+                setNotes(data.suggestedNotes);
+            }
         } catch (error) {
             console.error('Image analysis error:', error);
             alert('Failed to analyze image. Please try again.');

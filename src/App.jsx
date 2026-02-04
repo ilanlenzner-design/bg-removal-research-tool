@@ -168,9 +168,9 @@ function App() {
 
             if (analysisResponse.ok) {
                 const data = await analysisResponse.json();
-                console.log('[AUTO-ANALYSIS] Analysis received:', data.analysis);
-                // Store analysis in a ref or state that ResearchPanel can access
-                window.__imageAnalysis = data.analysis;
+                console.log('[AUTO-ANALYSIS] Analysis data received:', data);
+                // Store full analysis data (analysis, suggestedTestName, suggestedNotes) that ResearchPanel can access
+                window.__imageAnalysisData = data;
             } else {
                 console.error('[AUTO-ANALYSIS] Analysis failed with status:', analysisResponse.status);
             }
@@ -194,7 +194,7 @@ function App() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         results: resultsForScoring,
-                        replicateApiKey: apiKey
+                        geminiApiKey: geminiApiKey
                     })
                 });
 
