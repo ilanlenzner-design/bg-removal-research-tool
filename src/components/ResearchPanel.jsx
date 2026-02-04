@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TEST_CATEGORIES } from '../services/testDatabase';
+import { getApiUrl } from '../services/config';
 
 export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScoring, onToggleScoring, isSaved, replicateApiKey, onAutoScore }) {
     const [category, setCategory] = useState('');
@@ -55,7 +56,7 @@ export function ResearchPanel({ onSaveTest, scores, results, imageUrl, showScori
 
         setIsAnalyzing(true);
         try {
-            const response = await fetch('/api/analyze-image', {
+            const response = await fetch(getApiUrl('analyze-image'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

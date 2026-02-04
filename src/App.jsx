@@ -5,6 +5,7 @@ import { ResearchPanel } from './components/ResearchPanel';
 import { TestHistory } from './components/TestHistory';
 import { ModelScoreCard } from './components/ModelScoreCard';
 import { testDB } from './services/testDatabase';
+import { getApiUrl } from './services/config';
 
 function App() {
     const [apiKey, setApiKey] = useState(localStorage.getItem('replicate_api_key') || '');
@@ -20,7 +21,7 @@ function App() {
 
     // Fetch server API key on mount
     React.useEffect(() => {
-        fetch('/api/config')
+        fetch(getApiUrl('config'))
             .then(res => res.json())
             .then(config => {
                 if (config.apiKey) {
@@ -146,8 +147,8 @@ function App() {
 
         try {
             // Step 1: Analyze the original image
-            console.log('[AUTO-ANALYSIS] Calling /api/analyze-image...');
-            const analysisResponse = await fetch('/api/analyze-image', {
+            console.log('[AUTO-ANALYSIS] Calling analyze-image...');
+            const analysisResponse = await fetch(getApiUrl('analyze-image'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -181,7 +182,7 @@ function App() {
             });
 
             try {
-                const scoreResponse = await fetch('/api/score-all-results', {
+                const scoreResponse = await fetch(getApiUrl('score-all-results'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

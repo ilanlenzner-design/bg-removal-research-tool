@@ -1,4 +1,5 @@
 // Test Database Service - Manages research data storage
+import { getApiUrl } from './config';
 
 export const TEST_CATEGORIES = [
     { id: 'portrait', name: 'Portrait Photography', icon: '👤', color: '#ec4899' },
@@ -20,7 +21,7 @@ export class TestDatabase {
 
     async loadTests() {
         try {
-            const response = await fetch('/api/tests');
+            const response = await fetch(getApiUrl('tests'));
             if (response.ok) {
                 this.tests = await response.json();
             } else {
@@ -48,7 +49,7 @@ export class TestDatabase {
                 processingTimes: testData.processingTimes || {}
             };
 
-            const response = await fetch('/api/tests', {
+            const response = await fetch(getApiUrl('tests'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(test)
@@ -69,7 +70,7 @@ export class TestDatabase {
 
     async updateTest(testId, updates) {
         try {
-            const response = await fetch(`/api/tests/${testId}`, {
+            const response = await fetch(getApiUrl(`tests/${testId}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updates)
@@ -93,7 +94,7 @@ export class TestDatabase {
 
     async deleteTest(testId) {
         try {
-            const response = await fetch(`/api/tests/${testId}`, {
+            const response = await fetch(getApiUrl(`tests/${testId}`), {
                 method: 'DELETE'
             });
 
@@ -132,7 +133,7 @@ export class TestDatabase {
 
     async getStats() {
         try {
-            const response = await fetch('/api/tests/stats');
+            const response = await fetch(getApiUrl('tests/stats'));
             if (response.ok) {
                 return await response.json();
             } else {
