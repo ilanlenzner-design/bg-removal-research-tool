@@ -5,8 +5,8 @@
 // Using Google Apps Script backend (CORS issues with POST - not working):
 // export const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwLqUrcQc6CnlJUMNf01Aw2fOU4NvH_8Wk1v4eT_g1bevHMuiBtv3jAwfaCkfliwf7YQQ/exec';
 
-// Using Render backend (recommended - has CORS support):
-export const API_BASE_URL = 'https://replicate-bg-comparison.onrender.com';
+// Using integrated frontend + backend on same Render service (recommended - no CORS issues):
+export const API_BASE_URL = '';
 
 // Helper function to build API URLs
 export function getApiUrl(path) {
